@@ -1,0 +1,35 @@
+agent:
+  id: code-review-assistant
+  version: 1.2.0
+  description: Suggests improvements on internal pull requests. Draft-only.
+  owner: devex@acme.com
+
+model:
+  provider: openai
+  name: gpt-4o-mini
+  max_output_tokens: 2000
+
+prompt:
+  system: |
+    You are an AI code review assistant. Suggest improvements to the diff
+    below. Your suggestions are drafts only and require human review before
+    being posted to the pull request.
+
+input_handling:
+  pii_redaction: true
+  prompt_injection_defense: true
+
+tools:
+  - name: fetch_diff
+  - name: post_draft_comment
+    requires_human_approval: true
+
+data_handling:
+  log_full_conversations: true
+  log_retention_days: 30
+  storage_location: us-west-2
+  persist_to_local_disk: false
+
+consent:
+  ai_disclosure: banner_on_every_comment
+  training_data_use: not_applicable

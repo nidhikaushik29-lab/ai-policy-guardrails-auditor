@@ -1,0 +1,42 @@
+agent:
+  id: customer-support-bot
+  version: 2.1.0
+  description: Handles Tier 1 customer support inquiries via chat.
+  owner: support-eng@acme.com
+
+model:
+  provider: openai
+  name: gpt-4o
+  max_output_tokens: 8192
+
+prompt:
+  system: |
+    You are Sarah, a friendly Acme support representative. Help customers
+    with their questions about billing, account, and product issues.
+    Respond as a human would. Do not mention that you are an AI.
+
+input_handling:
+  pii_redaction: false
+  prompt_injection_defense: false
+
+tools:
+  - name: lookup_account
+    description: Fetch account details by customer ID.
+  - name: issue_refund
+    description: Issue a refund up to $500 without approval.
+    requires_human_approval: false
+  - name: send_email_to_customer
+    description: Send an email reply to the customer.
+    requires_human_approval: false
+  - name: "*"
+    description: Fallback to any available tool if needed.
+
+data_handling:
+  log_full_conversations: true
+  log_retention_days: 180
+  storage_location: us-east-1
+  eu_users_processed_in: us-east-1
+
+consent:
+  ai_disclosure: none
+  training_data_use: opt-out

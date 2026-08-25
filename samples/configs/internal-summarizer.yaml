@@ -1,0 +1,33 @@
+agent:
+  id: internal-doc-summarizer
+  version: 1.0.3
+  description: Summarizes internal engineering docs on request.
+  owner: platform-ai@acme.com
+
+model:
+  provider: openai
+  name: gpt-4o-mini
+  max_output_tokens: 2000
+
+prompt:
+  system: |
+    Summarize the provided internal document in 5 bullet points.
+
+input_handling:
+  pii_redaction: false
+  prompt_injection_defense: true
+
+tools:
+  - name: fetch_confluence_page
+  - name: fetch_source_code
+    description: Reads from Acme's confidential source repositories.
+
+data_handling:
+  log_full_conversations: true
+  log_retention_days: 30
+  storage_location: us-west-2
+  persist_to_local_disk: true
+
+consent:
+  ai_disclosure: internal_only_no_disclosure_needed
+  training_data_use: not_applicable

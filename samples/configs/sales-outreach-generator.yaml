@@ -1,0 +1,37 @@
+agent:
+  id: sales-outreach-generator
+  version: 0.9.1
+  description: Drafts personalized outreach emails to prospects.
+  owner: sales-ops@acme.com
+
+model:
+  provider: openai
+  name: gpt-4o
+  max_output_tokens: 4000
+
+prompt:
+  system: |
+    Draft a warm, personalized outreach email to the prospect based on
+    their LinkedIn profile and recent company news. Sign the email as if
+    it was written by the account executive personally.
+
+input_handling:
+  pii_redaction: true
+  prompt_injection_defense: false
+
+tools:
+  - name: fetch_linkedin_profile
+  - name: fetch_company_news
+  - name: send_email
+    requires_human_approval: false
+
+data_handling:
+  log_full_conversations: true
+  log_retention_days: 30
+  storage_location: us-east-1
+
+consent:
+  ai_disclosure: footer_only
+  training_data_use: opt-in
+  consent_language: |
+    By continuing you agree to our terms.
