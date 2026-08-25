@@ -433,14 +433,25 @@ _CALL_SEMAPHORE = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
 _MAX_RETRIES = 5
 
 
-async def _run_agent_with_backoff(agent: Agent, prompt: str):
-    """Call the agent with a global concurrency cap and exponential backoff
-    on rate-limit errors."""
+async def _run_agent_with_backoff(agent: Agent, prompt: str) -> str:
+    """Call the LLM directly using the agent's instructions as the system
+    prompt. Bypasses Runner because the OpenAI Agents SDK's response handling
+    is not fully compatible with Groq's gpt-oss models today.
+    Applies a global concurrency cap and exponential backoff on rate limits.
+    """
     delay = 2.0
     for attempt in range(_MAX_RETRIES):
         async with _CALL_SEMAPHORE:
             try:
-                return await Runner.run(agent, prompt)
+                resp = await _client.chat.completions.create(
+                    model=MODEL,
+                    messages=[
+                        {"role": "system", "content": agent.instructions},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.1,
+                )
+                return resp.choices[0].message.content or ""
             except Exception as e:
                 msg = str(e).lower()
                 is_rate = "rate limit" in msg or "429" in msg or "tokens per minute" in msg
@@ -450,6 +461,7 @@ async def _run_agent_with_backoff(agent: Agent, prompt: str):
                     raise
         await asyncio.sleep(delay)
         delay = min(delay * 2, 30.0)
+    return ""
 
 
 def make_agent_node(agent: Agent):
@@ -462,8 +474,8 @@ def make_agent_node(agent: Agent):
                 f"CONFIG_REF: {filename}\n\n"
                 f"CONFIG:\n{config_text}\n"
             )
-            result = await _run_agent_with_backoff(agent, prompt)
-            raw = _parse_json_array(result.final_output)
+            output_text = await _run_agent_with_backoff(agent, prompt)
+            raw = _parse_json_array(output_text)
             for f in raw:
                 f["agent"] = agent.name
                 f["source_config"] = filename
