@@ -450,11 +450,29 @@ async def _run_agent_with_backoff(agent: Agent, prompt: str) -> str:
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.1,
+                    max_tokens=4096,
+                    # gpt-oss reasoning models: keep the "thinking" short so the
+                    # final JSON actually fits in the response budget.
+                    extra_body={"reasoning_effort": "low"},
                 )
-                return resp.choices[0].message.content or ""
+                msg = resp.choices[0].message
+                # gpt-oss returns final answer in .content; reasoning tokens
+                # go to a separate channel (.reasoning or .reasoning_content).
+                # Prefer .content; fall back to reasoning if content is empty.
+                text = (getattr(msg, "content", None) or "").strip()
+                if not text:
+                    text = (
+                        getattr(msg, "reasoning", None)
+                        or getattr(msg, "reasoning_content", None)
+                        or ""
+                    ).strip()
+                if not text:
+                    finish = resp.choices[0].finish_reason
+                    print(f"[warn] {agent.name}: empty response (finish_reason={finish})")
+                return text
             except Exception as e:
-                msg = str(e).lower()
-                is_rate = "rate limit" in msg or "429" in msg or "tokens per minute" in msg
+                err = str(e).lower()
+                is_rate = "rate limit" in err or "429" in err or "tokens per minute" in err
                 if is_rate and attempt < _MAX_RETRIES - 1:
                     print(f"[retry] {agent.name}: rate-limited, sleeping {delay:.1f}s")
                 else:
