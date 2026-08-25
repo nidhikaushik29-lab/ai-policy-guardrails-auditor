@@ -398,6 +398,31 @@ def _parse_json_array(text: str) -> list:
         return []
 
 
+# Global concurrency cap + retry-on-rate-limit — required for free-tier Groq
+# which enforces 8000 TPM. Serializing calls keeps us safely under the cap.
+_CALL_SEMAPHORE = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
+_MAX_RETRIES = 5
+
+
+async def _run_agent_with_backoff(agent: Agent, prompt: str):
+    """Call the agent with a global concurrency cap and exponential backoff
+    on rate-limit errors."""
+    delay = 2.0
+    for attempt in range(_MAX_RETRIES):
+        async with _CALL_SEMAPHORE:
+            try:
+                return await Runner.run(agent, prompt)
+            except Exception as e:
+                msg = str(e).lower()
+                is_rate = "rate limit" in msg or "429" in msg or "tokens per minute" in msg
+                if is_rate and attempt < _MAX_RETRIES - 1:
+                    print(f"[retry] {agent.name}: rate-limited, sleeping {delay:.1f}s")
+                else:
+                    raise
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, 30.0)
+
+
 def make_agent_node(agent: Agent):
     """Factory: wraps a specialist agent as a LangGraph node."""
     async def _node(state: AuditState) -> dict:
@@ -408,7 +433,7 @@ def make_agent_node(agent: Agent):
                 f"CONFIG_REF: {filename}\n\n"
                 f"CONFIG:\n{config_text}\n"
             )
-            result = await Runner.run(agent, prompt)
+            result = await _run_agent_with_backoff(agent, prompt)
             raw = _parse_json_array(result.final_output)
             for f in raw:
                 f["agent"] = agent.name
