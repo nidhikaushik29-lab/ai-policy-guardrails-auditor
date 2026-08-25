@@ -31,6 +31,7 @@ from agents import (
     set_default_openai_client,
     set_tracing_disabled,
 )
+from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 from langgraph.graph import StateGraph, START, END
 from openai import AsyncOpenAI
 from typing_extensions import TypedDict
@@ -74,6 +75,11 @@ else:
 
 set_default_openai_client(_client)
 set_default_openai_api("chat_completions")  # required for non-OpenAI providers
+
+# Wrap in an explicit model instance so the SDK does not try to parse
+# "provider/name" strings (e.g. "openai/gpt-oss-120b") as routing hints.
+MODEL_INSTANCE = OpenAIChatCompletionsModel(model=MODEL, openai_client=_client)
+
 print(f"[setup] provider={PROVIDER} model={MODEL}")
 
 
@@ -83,7 +89,7 @@ print(f"[setup] provider={PROVIDER} model={MODEL}")
 
 policy_violation_agent = Agent(
     name="Policy Violation Agent",
-    model=MODEL,
+    model=MODEL_INSTANCE,
     instructions="""You are the Policy Violation Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: find configuration
 settings that DIRECTLY CONFLICT with a stated policy clause.
@@ -128,7 +134,7 @@ If no violations, return [].
 
 guardrail_gap_agent = Agent(
     name="Guardrail Gap Agent",
-    model=MODEL,
+    model=MODEL_INSTANCE,
     instructions="""You are the Guardrail Gap Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: find guardrails
 the policy REQUIRES that are MISSING or DISABLED in the configuration.
@@ -179,7 +185,7 @@ If no gaps, return [].
 
 consent_language_agent = Agent(
     name="Consent Language Agent",
-    model=MODEL,
+    model=MODEL_INSTANCE,
     instructions="""You are the Consent Language Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: evaluate the
 QUALITY, PLACEMENT, and CLARITY of user-facing consent and disclosure language
@@ -235,7 +241,7 @@ If no issues, return [].
 
 data_handling_agent = Agent(
     name="Data Handling Agent",
-    model=MODEL,
+    model=MODEL_INSTANCE,
     instructions="""You are the Data Handling Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: identify data
 flow, storage, retention, and residency risks in the configuration relative to
@@ -289,7 +295,7 @@ If no risks, return [].
 
 hitl_gap_agent = Agent(
     name="HITL Gap Agent",
-    model=MODEL,
+    model=MODEL_INSTANCE,
     instructions="""You are the Human-in-the-Loop Gap Agent in an enterprise AI
 governance review system. You are one of five specialists. Your ONLY job:
 identify decisions or actions where the policy REQUIRES human oversight and the
