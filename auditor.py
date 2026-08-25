@@ -59,7 +59,7 @@ if PROVIDER == "groq":
         base_url="https://api.groq.com/openai/v1",
         api_key=api_key,
     )
-    MODEL = os.getenv("MODEL", "llama-3.3-70b-versatile")
+    MODEL = os.getenv("MODEL", "openai/gpt-oss-120b")
 elif PROVIDER == "ollama":
     _client = AsyncOpenAI(
         base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),

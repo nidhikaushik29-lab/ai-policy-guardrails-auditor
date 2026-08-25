@@ -56,7 +56,7 @@ Runs on Groq (free tier) by default. Swap providers via the `PROVIDER` env var:
 | `ollama` | Free (local) | `curl -fsSL https://ollama.com/install.sh \| sh && ollama pull llama3.1:8b` |
 | `openai` | Paid | Get key at https://platform.openai.com/api-keys |
 
-Override the model per provider with the `MODEL` env var (defaults: Groq → `llama-3.3-70b-versatile`, Ollama → `llama3.1:8b`, OpenAI → `gpt-4.1`).
+Override the model per provider with the `MODEL` env var (defaults: Groq → `openai/gpt-oss-120b`, Ollama → `llama3.1:8b`, OpenAI → `gpt-4.1`).
 
 ## Dashboard
 
