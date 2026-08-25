@@ -17,6 +17,12 @@ from operator import add
 from pathlib import Path
 from typing import Annotated, Dict, List
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from agents import Agent, Runner, set_tracing_disabled
 from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
