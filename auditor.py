@@ -382,20 +382,49 @@ def ingest_node(state: AuditState) -> dict:
 
 
 def _parse_json_array(text: str) -> list:
-    """Best-effort parse of an agent's JSON-array output."""
-    text = text.strip()
-    # strip markdown fences if the model added them despite instructions
+    """Best-effort parse of an agent's JSON-array output.
+
+    Handles: raw JSON, markdown-fenced JSON, JSON embedded in prose,
+    and models that emit a single object instead of an array.
+    """
+    import re
+    text = (text or "").strip()
+
+    # strip markdown fences if present
     if text.startswith("```"):
         text = text.strip("`")
         if text.lower().startswith("json"):
             text = text[4:]
         text = text.strip()
+
+    # try direct parse first
     try:
         parsed = json.loads(text)
-        return parsed if isinstance(parsed, list) else []
-    except Exception as e:
-        print(f"[warn] failed to parse agent output as JSON: {e}")
-        return []
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            # some models return {"findings": [...]}
+            for k in ("findings", "results", "items"):
+                if isinstance(parsed.get(k), list):
+                    return parsed[k]
+            return [parsed]
+    except Exception:
+        pass
+
+    # fallback: find the first [...] block in the response
+    m = re.search(r"\[\s*(?:\{.*?\}\s*,?\s*)*\]", text, re.DOTALL)
+    if m:
+        try:
+            parsed = json.loads(m.group(0))
+            if isinstance(parsed, list):
+                return parsed
+        except Exception as e:
+            print(f"[warn] regex-extracted JSON parse failed: {e}")
+
+    # last resort: log a snippet so we can see what went wrong
+    snippet = text[:300].replace("\n", " ")
+    print(f"[warn] no JSON array found. First 300 chars: {snippet!r}")
+    return []
 
 
 # Global concurrency cap + retry-on-rate-limit — required for free-tier Groq
