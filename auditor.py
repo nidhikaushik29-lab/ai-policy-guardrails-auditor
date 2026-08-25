@@ -381,13 +381,43 @@ def ingest_node(state: AuditState) -> dict:
     }
 
 
+def _extract_json_array(text: str) -> str | None:
+    """Find the first top-level JSON array in `text` via bracket matching.
+    Handles nested braces and quoted strings correctly, unlike regex."""
+    start = text.find("[")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == "\\":
+            escape = True
+            continue
+        if c == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
 def _parse_json_array(text: str) -> list:
     """Best-effort parse of an agent's JSON-array output.
 
     Handles: raw JSON, markdown-fenced JSON, JSON embedded in prose,
     and models that emit a single object instead of an array.
     """
-    import re
     text = (text or "").strip()
 
     # strip markdown fences if present
@@ -403,7 +433,6 @@ def _parse_json_array(text: str) -> list:
         if isinstance(parsed, list):
             return parsed
         if isinstance(parsed, dict):
-            # some models return {"findings": [...]}
             for k in ("findings", "results", "items"):
                 if isinstance(parsed.get(k), list):
                     return parsed[k]
@@ -411,17 +440,16 @@ def _parse_json_array(text: str) -> list:
     except Exception:
         pass
 
-    # fallback: find the first [...] block in the response
-    m = re.search(r"\[\s*(?:\{.*?\}\s*,?\s*)*\]", text, re.DOTALL)
-    if m:
+    # bracket-match extract the first top-level array
+    chunk = _extract_json_array(text)
+    if chunk:
         try:
-            parsed = json.loads(m.group(0))
+            parsed = json.loads(chunk)
             if isinstance(parsed, list):
                 return parsed
         except Exception as e:
-            print(f"[warn] regex-extracted JSON parse failed: {e}")
+            print(f"[warn] extracted JSON parse failed: {e}")
 
-    # last resort: log a snippet so we can see what went wrong
     snippet = text[:300].replace("\n", " ")
     print(f"[warn] no JSON array found. First 300 chars: {snippet!r}")
     return []
@@ -450,7 +478,7 @@ async def _run_agent_with_backoff(agent: Agent, prompt: str) -> str:
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.1,
-                    max_tokens=4096,
+                    max_tokens=8192,
                     # gpt-oss reasoning models: keep the "thinking" short so the
                     # final JSON actually fits in the response budget.
                     extra_body={"reasoning_effort": "low"},
