@@ -13,6 +13,7 @@ Author: Nidhi Aggarwal
 # === Imports and Setup ===
 import asyncio
 import json
+import os
 from operator import add
 from pathlib import Path
 from typing import Annotated, Dict, List
@@ -23,11 +24,57 @@ try:
 except ImportError:
     pass
 
-from agents import Agent, Runner, set_tracing_disabled
+from agents import (
+    Agent,
+    Runner,
+    set_default_openai_api,
+    set_default_openai_client,
+    set_tracing_disabled,
+)
 from langgraph.graph import StateGraph, START, END
+from openai import AsyncOpenAI
 from typing_extensions import TypedDict
 
 set_tracing_disabled(True)
+
+
+# ============================================================================
+# 0. LLM PROVIDER SWITCH
+# ============================================================================
+# Set PROVIDER in .env to swap backends:
+#   groq   -> uses GROQ_API_KEY, free tier, cloud (default)
+#   ollama -> uses local Ollama at http://localhost:11434
+#   openai -> uses OPENAI_API_KEY, paid
+
+PROVIDER = os.getenv("PROVIDER", "groq").lower()
+
+if PROVIDER == "groq":
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "PROVIDER=groq but GROQ_API_KEY is not set. "
+            "Get a free key at https://console.groq.com/keys"
+        )
+    _client = AsyncOpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=api_key,
+    )
+    MODEL = os.getenv("MODEL", "llama-3.3-70b-versatile")
+elif PROVIDER == "ollama":
+    _client = AsyncOpenAI(
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+        api_key="ollama",  # dummy; Ollama ignores it
+    )
+    MODEL = os.getenv("MODEL", "llama3.1:8b")
+elif PROVIDER == "openai":
+    _client = AsyncOpenAI()  # uses OPENAI_API_KEY from env
+    MODEL = os.getenv("MODEL", "gpt-4.1")
+else:
+    raise RuntimeError(f"Unknown PROVIDER '{PROVIDER}'. Use groq | ollama | openai.")
+
+set_default_openai_client(_client)
+set_default_openai_api("chat_completions")  # required for non-OpenAI providers
+print(f"[setup] provider={PROVIDER} model={MODEL}")
 
 
 # ============================================================================
@@ -36,7 +83,7 @@ set_tracing_disabled(True)
 
 policy_violation_agent = Agent(
     name="Policy Violation Agent",
-    model="gpt-4.1",
+    model=MODEL,
     instructions="""You are the Policy Violation Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: find configuration
 settings that DIRECTLY CONFLICT with a stated policy clause.
@@ -81,7 +128,7 @@ If no violations, return [].
 
 guardrail_gap_agent = Agent(
     name="Guardrail Gap Agent",
-    model="gpt-4.1",
+    model=MODEL,
     instructions="""You are the Guardrail Gap Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: find guardrails
 the policy REQUIRES that are MISSING or DISABLED in the configuration.
@@ -132,7 +179,7 @@ If no gaps, return [].
 
 consent_language_agent = Agent(
     name="Consent Language Agent",
-    model="gpt-4.1",
+    model=MODEL,
     instructions="""You are the Consent Language Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: evaluate the
 QUALITY, PLACEMENT, and CLARITY of user-facing consent and disclosure language
@@ -188,7 +235,7 @@ If no issues, return [].
 
 data_handling_agent = Agent(
     name="Data Handling Agent",
-    model="gpt-4.1",
+    model=MODEL,
     instructions="""You are the Data Handling Agent in an enterprise AI governance
 review system. You are one of five specialists. Your ONLY job: identify data
 flow, storage, retention, and residency risks in the configuration relative to
@@ -242,7 +289,7 @@ If no risks, return [].
 
 hitl_gap_agent = Agent(
     name="HITL Gap Agent",
-    model="gpt-4.1",
+    model=MODEL,
     instructions="""You are the Human-in-the-Loop Gap Agent in an enterprise AI
 governance review system. You are one of five specialists. Your ONLY job:
 identify decisions or actions where the policy REQUIRES human oversight and the

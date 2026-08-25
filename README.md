@@ -38,13 +38,25 @@ This tool makes AI governance **operational** — the same way linters and secur
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # then edit .env and add your OPENAI_API_KEY
+cp .env.example .env      # then edit .env and add your GROQ_API_KEY
 python auditor.py
 ```
 
 Outputs land in `out/report.json` and `out/report.md`.
+
+## LLM provider
+
+Runs on Groq (free tier) by default. Swap providers via the `PROVIDER` env var:
+
+| Provider | Cost | Setup |
+|----------|------|-------|
+| `groq` (default) | Free tier | Get key at https://console.groq.com/keys |
+| `ollama` | Free (local) | `curl -fsSL https://ollama.com/install.sh \| sh && ollama pull llama3.1:8b` |
+| `openai` | Paid | Get key at https://platform.openai.com/api-keys |
+
+Override the model per provider with the `MODEL` env var (defaults: Groq → `llama-3.3-70b-versatile`, Ollama → `llama3.1:8b`, OpenAI → `gpt-4.1`).
 
 ## Dashboard
 
