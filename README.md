@@ -46,6 +46,28 @@ python auditor.py
 
 Outputs land in `out/report.json` and `out/report.md`.
 
+## Dashboard
+
+After running the auditor, launch the Streamlit dashboard:
+
+```bash
+streamlit run dashboard.py
+```
+
+Then open http://localhost:8501. The dashboard shows KPIs, filters by severity/agent/config, charts, and drill-down evidence for every finding.
+
+## Smoke test
+
+The smoke test runs the full pipeline end-to-end and asserts:
+- Recall on planted violations is ≥ 85%
+- The clean baseline config produces ≤ 1 finding
+
+It hits the OpenAI API and costs real tokens. Run selectively:
+
+```bash
+pytest -m smoke tests/test_smoke.py -s
+```
+
 ## What ships
 
 - `auditor.py` — the full runnable orchestrator (agents + graph + synthesizer + renderer)
